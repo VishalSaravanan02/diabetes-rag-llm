@@ -10,3 +10,6 @@ __pycache__/
 # Ignore other common Python temporary files
 *.pyc
 *.pyo
+
+# Ignore idea file
+.idea

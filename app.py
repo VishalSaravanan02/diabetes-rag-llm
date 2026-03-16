@@ -1,55 +1,22 @@
-# app.py
-from src.retriever import retrieve  # your FAISS + embeddings retriever
-import ollama  # Python client for local Ollama
+import streamlit as st
+import ollama
 
-# -----------------------------
-# 1. Choose your local model
-# -----------------------------
-MODEL_NAME = "llama2"  # change if you pulled a different model locally
+st.set_page_config(page_title="Diabetes RAG LLM", page_icon="🧬")
+st.title("Diabetes RAG LLM")
+st.write("Ask questions and get answers from your RAG model!")
 
-# -----------------------------
-# 2. Generate answer function
-# -----------------------------
-def generate_answer(query, top_k=5):
-    """
-    Retrieve top-k relevant chunks and generate an answer
-    using a local LLM (Ollama).
-    """
-    # Step 1: Retrieve top relevant chunks
-    top_chunks = retrieve(query, top_k=top_k)
+query = st.text_input("Enter your question:")
 
-    # Step 2: Combine chunks into context
-    context = "\n\n".join(top_chunks)
+if st.button("Get Answer") and query:
+    try:
+        response = ollama.chat(
+            model="llama3",
+            messages=[{"role": "user", "content": query}]
+        )
+        st.success(response["message"]["content"])
+    except Exception as e:
+        st.error(f"Error getting response: {e}")
 
-    # Step 3: Create the prompt
-    prompt = (
-        f"You are a helpful medical research assistant. "
-        f"Answer the question using only the context below. "
-        f"If the answer is not in the context, say 'I don't know'.\n\n"
-        f"Context:\n{context}\n\nQuestion: {query}\nAnswer:"
-    )
+st.markdown("---")
+st.markdown("💡 Built with Streamlit + Ollama")
 
-    # Step 4: Call Ollama generate
-    response = ollama.generate(model=MODEL_NAME, prompt=prompt)
-
-    # ✔️ Use .response to get the generated text
-    return response.response
-
-# -----------------------------
-# 3. Run interactive QA app
-# -----------------------------
-if __name__ == "__main__":
-    print("=== PubMed RAG QA System (Local LLM) ===")
-
-    while True:
-        user_query = input("\nEnter your question (or 'exit' to quit): ")
-        if user_query.lower() in ("exit", "quit"):
-            print("Exiting app...")
-            break
-
-        try:
-            answer = generate_answer(user_query, top_k=5)
-            print("\n=== Generated Answer ===\n")
-            print(answer)
-        except Exception as e:
-            print(f"Error generating answer: {e}")

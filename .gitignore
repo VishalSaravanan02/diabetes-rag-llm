@@ -19,3 +19,7 @@ data/
 
 # Environment variables
 .env
+
+# JetBrains IDE files
+.idea/
+*.iml

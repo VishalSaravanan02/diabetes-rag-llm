@@ -1,15 +1,21 @@
-# Ignore environment file
-.env
-
-# Ignore Python virtual environment
-.venv/
-
-# Ignore __pycache__ folders
+# Python
 __pycache__/
-
-# Ignore other common Python temporary files
 *.pyc
 *.pyo
+*.pyd
 
-# Ignore idea file
-.idea
+# Virtual environment
+.venv/
+env/
+venv/
+
+# Data files (FAISS index, chunks)
+data/
+*.faiss
+*.pkl
+
+# OS
+.DS_Store
+
+# Environment variables
+.env

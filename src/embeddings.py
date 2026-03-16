@@ -4,7 +4,6 @@ import faiss
 import pickle
 from pathlib import Path
 
-# Load the chunks
 CHUNKS_FILE = Path(__file__).resolve().parent.parent / "data" / "chunks.json"
 
 with open(CHUNKS_FILE, "r", encoding="utf-8") as f:
@@ -13,18 +12,15 @@ with open(CHUNKS_FILE, "r", encoding="utf-8") as f:
 print(f"Total chunks loaded: {len(chunks)}")
 
 
-# Initialize embedding model
 model = SentenceTransformer('all-MiniLM-L6-v2')
 
 
-# Generate embeddings
 print("Generating embeddings...")
 embeddings = model.encode(chunks, show_progress_bar=True)
 
 print(f"Embeddings shape: {embeddings.shape}")
 
 
-# Create FAISS vector store
 dimension = embeddings.shape[1]
 index = faiss.IndexFlatL2(dimension)  # L2 distance
 index.add(embeddings)
@@ -32,12 +28,10 @@ index.add(embeddings)
 print(f"Number of vectors in FAISS index: {index.ntotal}")
 
 
-# Save FAISS index and chunks
 VECTOR_STORE_DIR = Path(__file__).resolve().parent.parent / "data"
 faiss.write_index(index, str(VECTOR_STORE_DIR / "vector_index.faiss"))
 
 
-# Save chunks as reference
 with open(VECTOR_STORE_DIR / "chunks.pkl", "wb") as f:
     pickle.dump(chunks, f)
 

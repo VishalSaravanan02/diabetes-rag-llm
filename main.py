@@ -1,14 +1,9 @@
 from src.retriever import retrieve  # your FAISS + embeddings retriever
 import ollama  # Python client for local Ollama
 
-# -----------------------------
-# 1. Choose your local model
-# -----------------------------
-MODEL_NAME = "llama2"  # change if you pulled a different model locally
 
-# -----------------------------
-# 2. Generate answer function
-# -----------------------------
+MODEL_NAME = "llama2" 
+
 def generate_answer(query, top_k=5):
     """
     Retrieve top-k relevant chunks and generate an answer
@@ -34,9 +29,7 @@ def generate_answer(query, top_k=5):
     # ✔️ Use .response to get the generated text
     return response.response
 
-# -----------------------------
-# 3. Run interactive QA app
-# -----------------------------
+
 if __name__ == "__main__":
     print("=== PubMed RAG QA System (Local LLM) ===")
 

@@ -3,26 +3,21 @@ import faiss
 import pickle
 from pathlib import Path
 
-# Load FAISS index and chunks
 VECTOR_STORE_DIR = Path(__file__).resolve().parent.parent / "data"
 
 
-# Load FAISS index
 index = faiss.read_index(str(VECTOR_STORE_DIR / "vector_index.faiss"))
 
 
-# Load chunks
 with open(VECTOR_STORE_DIR / "chunks.pkl", "rb") as f:
     chunks = pickle.load(f)
 
 print(f"Loaded {len(chunks)} chunks and FAISS index with {index.ntotal} vectors.")
 
 
-# Initialize embedding model
 model = SentenceTransformer('all-MiniLM-L6-v2')
 
 
-# Query function
 def retrieve(query, top_k=5):
     """
     Retrieve top-k most relevant chunks for a query.
@@ -37,7 +32,6 @@ def retrieve(query, top_k=5):
     return results
 
 
-# Test the retriever
 if __name__ == "__main__":
     user_query = "What are the genetic causes of hyperinsulinism?"
     top_chunks = retrieve(user_query, top_k=5)

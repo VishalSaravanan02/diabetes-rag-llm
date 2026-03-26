@@ -55,8 +55,12 @@ if submit and query:
         st.caption(f"{len(results)} chunk(s) retrieved from the knowledge base.")
 
         for i, result in enumerate(results, 1):
-            with st.expander(f"Source {i} — Relevance distance: {result['distance']:.4f}"):
+            pmid = result["pmid"]
+            pubmed_url = f"https://pubmed.ncbi.nlm.nih.gov/{pmid}"
+
+            with st.expander(f"Source {i} — PMID: {pmid} — Relevance distance: {result['distance']:.4f}"):
                 st.write(result["chunk"])
+                st.markdown(f"🔗 [View on PubMed]({pubmed_url})")
 
 elif submit and not query:
     st.warning("Please enter a question before clicking Ask.")

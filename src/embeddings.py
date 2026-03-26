@@ -8,6 +8,7 @@ from config import CHUNKS_FILE, FAISS_INDEX_FILE, CHUNKS_PKL, EMBEDDING_MODEL
 def build_index():
     """
     Load chunks, generate embeddings, build a FAISS index, and save to disk.
+    Chunks are stored as dicts with 'text' and 'pmid' keys.
     """
 
     # Load chunks
@@ -26,6 +27,8 @@ def build_index():
     print(f"Total chunks loaded: {len(chunks)}")
 
     # Generate embeddings
+    texts = [chunk["text"] for chunk in chunks]
+
     print(f"Loading embedding model: {EMBEDDING_MODEL}")
     model = SentenceTransformer(EMBEDDING_MODEL)
 

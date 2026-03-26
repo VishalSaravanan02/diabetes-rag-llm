@@ -17,6 +17,8 @@ def clean_text(text):
 def preprocess():
     """
     Load raw PubMed abstracts, clean and chunk them, and save to disk.
+    Each chunk is stored as a dict with 'text' and 'pmid' keys so that
+    source attribution is preserved through the full pipeline.
     """
 
     # Load abstracts
@@ -32,25 +34,28 @@ def preprocess():
     print(f"Total papers loaded: {len(data)}")
 
     # Extract and clean abstracts
-    abstracts = []
-    for item in data:
-        if "abstract" in item and item["abstract"]:
-            cleaned = clean_text(item["abstract"])
-            abstracts.append(cleaned)
-
-    print(f"Total abstracts extracted: {len(abstracts)}")
-
-    # Chunk abstracts
     text_splitter = RecursiveCharacterTextSplitter(
         chunk_size=CHUNK_SIZE,
         chunk_overlap=CHUNK_OVERLAP
     )
 
     all_chunks = []
-    for abstract in abstracts:
-        chunks = text_splitter.split_text(abstract)
-        all_chunks.extend(chunks)
+    abstract_count = 0
 
+    for item in data:
+        if "abstract" in item and item["abstract"]:
+            abstract_count += 1
+            cleaned = clean_text(item["abstract"])
+            chunks = text_splitter.split_text(cleaned)
+
+            # Attach the PMID to every chunk from this abstract
+            for chunk in chunks:
+                all_chunks.append({
+                    "text": chunk,
+                    "pmid": item["pmid"]
+                })
+
+    print(f"Total abstracts extracted: {abstract_count}")
     print(f"Total chunks created: {len(all_chunks)}")
 
     # Save chunks to disk

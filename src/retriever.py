@@ -48,7 +48,7 @@ def retrieve(query, top_k=TOP_K):
     Retrieve top-k most relevant chunks for a query.
     Filters out chunks whose L2 distance exceeds DISTANCE_THRESHOLD.
 
-    Returns a list of dicts with keys: 'chunk' and 'distance'.
+    Returns a list of dicts with keys: 'chunk', 'pmid' and 'distance'.
     """
     _load()
 
@@ -59,7 +59,8 @@ def retrieve(query, top_k=TOP_K):
     for idx, dist in zip(indices[0], distances[0]):
         if dist <= DISTANCE_THRESHOLD:
             results.append({
-                "chunk": _chunks[idx],
+                "chunk": _chunks[idx]["text"],
+                "pmid": _chunks[idx]["pmid"],
                 "distance": float(dist)
             })
 

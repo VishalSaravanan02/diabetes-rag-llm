@@ -9,11 +9,11 @@ A Retrieval-Augmented Generation (RAG) system that answers biomedical questions 
 This project implements a full RAG pipeline:
 
 1. **Fetch** — PubMed abstracts on diabetes are retrieved using the NCBI Entrez API
-2. **Preprocess** — Abstracts are chunked into overlapping segments for better retrieval
+2. **Preprocess** — Abstracts are cleaned and chunked into overlapping segments for better retrieval
 3. **Embed** — Chunks are encoded using `all-MiniLM-L6-v2` and stored in a FAISS vector index
-4. **Retrieve** — At query time, the most semantically relevant chunks are retrieved
+4. **Retrieve** — At query time, the most semantically relevant chunks are retrieved with distance-based filtering
 5. **Generate** — A local LLM (LLaMA via Ollama) generates a grounded answer using the retrieved context
-6. **Interface** — A Streamlit web app provides a clean UI for querying the system
+6. **Interface** — A Streamlit web app provides a clean UI for querying the system, with source citations
 
 ---
 
@@ -24,15 +24,16 @@ diabetes-rag-llm/
 │
 ├── app.py                  # Streamlit web interface
 ├── main.py                 # CLI entry point for the RAG QA system
+├── config.py               # Centralised configuration (paths, models, parameters)
 ├── requirements.txt        # Python dependencies
 │
 ├── src/
 │   ├── __init__.py
 │   ├── fetch_data.py       # Fetches abstracts from PubMed via Entrez
-│   ├── preprocess.py       # Chunks abstracts using LangChain text splitter
+│   ├── preprocess.py       # Cleans and chunks abstracts using LangChain text splitter
 │   ├── embeddings.py       # Generates embeddings and builds FAISS index
 │   ├── retriever.py        # Loads FAISS index and retrieves relevant chunks
-│   └── generator.py        # Generates answers using Ollama (LLaMA 3.1)
+│   └── generator.py        # Generates answers using Ollama (LLaMA 3)
 │
 └── data/
     ├── diabetes_abstracts.json   # Raw PubMed abstracts (generated)
@@ -47,11 +48,10 @@ diabetes-rag-llm/
 
 - Python 3.9+
 - [Ollama](https://ollama.com/) installed and running locally
-- The following Ollama models pulled:
+- LLaMA 3 pulled via Ollama:
 
 ```bash
-ollama pull llama3.1       # For answer generation (used in generator.py / app.py)
-ollama pull llama2         # For answer generation (used in main.py)
+ollama pull llama3
 ```
 
 > **Note:** `all-MiniLM-L6-v2` is used for embeddings via `sentence-transformers` (installed as a Python package — no Ollama pull needed).
@@ -81,32 +81,41 @@ source .venv/bin/activate        # macOS/Linux
 pip install -r requirements.txt
 ```
 
+### 4. Set your NCBI Entrez email
+
+NCBI requires a valid email for API access. Set it as an environment variable:
+
+```bash
+export ENTREZ_EMAIL="your@email.com"   # macOS/Linux
+set ENTREZ_EMAIL="your@email.com"      # Windows
+```
+
 ---
 
 ## 🔧 Building the Knowledge Base
 
-Run these steps once to fetch data and build the vector index.
+Run these steps once to fetch data and build the vector index. Always run from the **project root** using `-m`:
 
 ### Step 1 — Fetch PubMed abstracts
 
 ```bash
-python src/fetch_data.py
+python -m src.fetch_data
 ```
 
-This fetches 50 PubMed abstracts about diabetes and saves them to `data/diabetes_abstracts.json`.
+Fetches 50 PubMed abstracts about diabetes and saves them to `data/diabetes_abstracts.json`.
 
 ### Step 2 — Preprocess and chunk the abstracts
 
 ```bash
-python src/preprocess.py
+python -m src.preprocess
 ```
 
-Splits abstracts into 500-token chunks with 100-token overlap and saves them to `data/chunks.json`.
+Cleans and splits abstracts into 500-character chunks with 100-character overlap, saved to `data/chunks.json`.
 
 ### Step 3 — Generate embeddings and build FAISS index
 
 ```bash
-python src/embeddings.py
+python -m src.embeddings
 ```
 
 Encodes all chunks using `all-MiniLM-L6-v2` and saves the FAISS index to `data/vector_index.faiss`.
@@ -123,6 +132,11 @@ streamlit run app.py
 
 Then open [http://localhost:8501](http://localhost:8501) in your browser.
 
+Features:
+- Ask biomedical questions grounded in PubMed research
+- Adjust the number of retrieved sources using the slider
+- View the retrieved PubMed chunks that informed the answer, with relevance distance scores
+
 ### Option B — CLI Interactive Mode
 
 ```bash
@@ -133,24 +147,36 @@ Type your question at the prompt and press Enter. Type `exit` or `quit` to stop.
 
 ---
 
+## ⚙️ Configuration
+
+All key settings are centralised in `config.py` at the project root:
+
+| Setting | Default | Description |
+|---|---|---|
+| `LLM_MODEL` | `"llama3"` | Ollama model used for generation |
+| `EMBEDDING_MODEL` | `"all-MiniLM-L6-v2"` | Sentence transformer model for embeddings |
+| `CHUNK_SIZE` | `500` | Character size of each text chunk |
+| `CHUNK_OVERLAP` | `100` | Overlap between consecutive chunks |
+| `TOP_K` | `5` | Number of chunks retrieved per query |
+| `DISTANCE_THRESHOLD` | `1.5` | Max L2 distance for a chunk to be considered relevant |
+
+To switch models or tune retrieval, edit `config.py` — changes apply across the whole project automatically.
+
+> **Tip:** If answers seem too brief or retrieval returns no results, try increasing `TOP_K` or `DISTANCE_THRESHOLD` in `config.py`.
+
+---
+
 ## 🧪 Example Query
 
 **Question:** What is diabetes?
 
-**Answer:** *(Generated from retrieved PubMed context using LLaMA)*
+**Answer:** *(Generated from retrieved PubMed context using LLaMA 3)*
 
-Diabetes is a group of metabolic disorders characterized by high blood sugar levels. It occurs when the body either does not produce enough insulin (a hormone that regulates blood sugar levels) or cannot effectively use the insulin it produces.
+According to the context, Diabetes mellitus (DM) is a major contributor to disability and mortality, accounting for nearly 10% of all deaths in people aged 20 to 79 years.
 
-There are several types of diabetes, including:
+**Retrieved Sources:** 5 chunks retrieved from the knowledge base, each with a relevance distance score shown in the UI.
 
-1. **Type 1 Diabetes:** An autoimmune disease in which the pancreas is unable to produce insulin, resulting in high blood sugar levels.
-2. **Type 2 Diabetes:** The most common form of diabetes, characterized by insulin resistance and impaired insulin secretion.
-3. **Gestational Diabetes:** A type of diabetes that develops during pregnancy, usually in the second or third trimester.
-4. **LADA (Latent Autoimmune Diabetes in Adults):** A form of type 1 diabetes that resembles type 2 diabetes in terms of symptoms and progression.
-
-Common risk factors include family history, obesity, physical inactivity, high blood pressure, high cholesterol, age, and ethnicity. Symptoms can include increased thirst and urination, fatigue, blurred vision, slow wound healing, and frequent infections.
-
-If left untreated, diabetes can lead to serious complications such as kidney damage (nephropathy), nerve damage (neuropathy), eye damage (retinopathy), foot ulcers, and increased risk of heart disease and stroke. With proper treatment — including medication, lifestyle changes, and insulin therapy where necessary — many people with diabetes are able to manage their condition effectively.
+> **Note:** Answers are grounded strictly in the retrieved PubMed abstracts. The richer and larger the knowledge base, the more comprehensive the answers. Consider increasing `max_results` in `fetch_data.py` for broader coverage.
 
 ---
 
@@ -162,8 +188,26 @@ If left untreated, diabetes can lead to serious complications such as kidney dam
 | Text chunking | LangChain `RecursiveCharacterTextSplitter` |
 | Embeddings | `sentence-transformers` (`all-MiniLM-L6-v2`) |
 | Vector store | FAISS (`faiss-cpu`) |
-| LLM | LLaMA 2 / LLaMA 3.1 via Ollama |
+| LLM | LLaMA 3 via Ollama |
 | Web interface | Streamlit |
+
+---
+
+## 🗺️ Roadmap
+
+- [x] Build full RAG pipeline (fetch → preprocess → embed → retrieve → generate)
+- [x] Create `config.py` to centralise model names, paths, and parameters
+- [x] Fix `app.py` to use the full RAG pipeline instead of direct Ollama calls
+- [x] Consolidate generation logic into `generator.py`
+- [x] Standardise path handling across all `src/` files
+- [x] Add distance threshold filtering in `retriever.py`
+- [x] Add source chunk display in the Streamlit UI
+- [x] Add light text cleaning in `preprocess.py`
+- [x] Add batch fetching in `fetch_data.py`
+- [ ] Add PMID metadata through the full pipeline for proper source attribution
+- [ ] Increase abstract coverage (fetch 200+ abstracts for richer answers)
+- [ ] Explore PubMed Central (PMC) full-text articles for deeper context
+- [ ] Add streaming responses in the Streamlit UI
 
 ---
 
@@ -175,5 +219,5 @@ This project is open source and available under the [MIT License](LICENSE).
 
 ## 🙋 Author
 
-**Vishal Saravanan**  
+**Vishal Saravanan**
 [GitHub](https://github.com/VishalSaravanan02)

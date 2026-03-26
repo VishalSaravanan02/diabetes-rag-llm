@@ -1,4 +1,5 @@
 import ollama
+from config import LLM_MODEL
 
 def generate_answer(question, context):
     prompt = f"""
@@ -16,11 +17,14 @@ def generate_answer(question, context):
     Answer:
     """
 
-    response = ollama.chat(
-        model="llama3.1",
-        messages=[
-            {"role": "user", "content": prompt}
-        ]
-    )
+    try:
+        response = ollama.chat(
+            model=LLM_MODEL,
+            messages=[
+                {"role": "user", "content": prompt}
+            ]
+        )
 
-    return response["message"]["content"]
+        return response["message"]["content"]
+    except Exception as e:
+        return f"Error generating answer: {str(e)}"

@@ -1,54 +1,53 @@
-from src.retriever import retrieve  # your FAISS + embeddings retriever
-import ollama  # Python client for local Ollama
+from src.retriever import retrieve
+from src.generator import generate_answer
+from config import TOP_K
 
-# -----------------------------
-# 1. Choose your local model
-# -----------------------------
-MODEL_NAME = "llama2"  # change if you pulled a different model locally
 
-# -----------------------------
-# 2. Generate answer function
-# -----------------------------
-def generate_answer(query, top_k=5):
+def answer_question(query, top_k=TOP_K):
     """
-    Retrieve top-k relevant chunks and generate an answer
-    using a local LLM (Ollama).
+    Retrieve relevant chunks from the FAISS index and generate
+    a grounded answer using the local LLM.
+
+    Args:
+        query:  The user's question
+        top_k:  Number of chunks to retrieve (default from config)
+
+    Returns:
+        A tuple of (answer, sources) where sources is a list of PMIDs
     """
-    # Step 1: Retrieve top relevant chunks
-    top_chunks = retrieve(query, top_k=top_k)
 
-    # Step 2: Combine chunks into context
-    context = "\n\n".join(top_chunks)
+    # Retrieve relevant chunks
+    results = retrieve(query, top_k=top_k)
 
-    # Step 3: Create the prompt
-    prompt = (
-        f"You are a helpful medical research assistant. "
-        f"Answer the question using only the context below. "
-        f"If the answer is not in the context, say 'I don't know'.\n\n"
-        f"Context:\n{context}\n\nQuestion: {query}\nAnswer:"
-    )
+    if not results:
+        return "I couldn't find any relevant information in the knowledge base for that question.", []
 
-    # Step 4: Call Ollama generate
-    response = ollama.generate(model=MODEL_NAME, prompt=prompt)
+    # Build context from retrieved chunks
+    context = "\n\n".join([r["chunk"] for r in results])
 
-    # ✔️ Use .response to get the generated text
-    return response.response
+    # Generate answer
+    answer = generate_answer(query, context)
 
-# -----------------------------
-# 3. Run interactive QA app
-# -----------------------------
+    return answer
+
+
 if __name__ == "__main__":
     print("=== PubMed RAG QA System (Local LLM) ===")
+    print("Type 'exit' or 'quit' to stop.\n")
 
     while True:
-        user_query = input("\nEnter your question (or 'exit' to quit): ")
+        user_query = input("\nEnter your question: ").strip()
+
+        if not user_query:
+            continue
+
         if user_query.lower() in ("exit", "quit"):
             print("Exiting app...")
             break
 
         try:
-            answer = generate_answer(user_query, top_k=5)
+            answer = answer_question(user_query, top_k=TOP_K)
             print("\n=== Generated Answer ===\n")
             print(answer)
         except Exception as e:
-            print(f"Error generating answer: {e}")
+            print(f"Error: {str(e)}")

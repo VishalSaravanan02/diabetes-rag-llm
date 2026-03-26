@@ -2,37 +2,55 @@ import json
 from sentence_transformers import SentenceTransformer
 import faiss
 import pickle
-from pathlib import Path
-
-CHUNKS_FILE = Path(__file__).resolve().parent.parent / "data" / "chunks.json"
-
-with open(CHUNKS_FILE, "r", encoding="utf-8") as f:
-    chunks = json.load(f)
-
-print(f"Total chunks loaded: {len(chunks)}")
+from config import CHUNKS_FILE, FAISS_INDEX_FILE, CHUNKS_PKL, EMBEDDING_MODEL
 
 
-model = SentenceTransformer('all-MiniLM-L6-v2')
+def build_index():
+    """
+    Load chunks, generate embeddings, build a FAISS index, and save to disk.
+    """
+
+    # Load chunks
+    if not CHUNKS_FILE.exists():
+        raise FileNotFoundError(
+            f"Chunks file not found at {CHUNKS_FILE}. "
+            "Please run preprocess.py first."
+        )
+
+    with open(CHUNKS_FILE, "r", encoding="utf-8") as f:
+        chunks = json.load(f)
+
+    if not chunks:
+        raise ValueError("Chunks file is empty. Please re-run preprocess.py.")
+
+    print(f"Total chunks loaded: {len(chunks)}")
+
+    # Generate embeddings
+    print(f"Loading embedding model: {EMBEDDING_MODEL}")
+    model = SentenceTransformer(EMBEDDING_MODEL)
+
+    print("Generating embeddings...")
+    embeddings = model.encode(chunks, show_progress_bar=True, batch_size=32)
+    print(f"Embeddings shape: {embeddings.shape}")
+
+    # Build FAISS index
+    dimension = embeddings.shape[1]
+    index = faiss.IndexFlatL2(dimension)
+    index.add(embeddings)
+    print(f"Number of vectors in FAISS index: {index.ntotal}")
+
+    # Save index and chunks to disk
+    FAISS_INDEX_FILE.parent.mkdir(parents=True, exist_ok=True)
+
+    faiss.write_index(index, str(FAISS_INDEX_FILE))
+    print(f"FAISS index saved to {FAISS_INDEX_FILE}")
+
+    with open(CHUNKS_PKL, "wb") as f:
+        pickle.dump(chunks, f)
+    print(f"Chunks saved to {CHUNKS_PKL}")
+
+    print("\nDone! Knowledge base is ready.")
 
 
-print("Generating embeddings...")
-embeddings = model.encode(chunks, show_progress_bar=True)
-
-print(f"Embeddings shape: {embeddings.shape}")
-
-
-dimension = embeddings.shape[1]
-index = faiss.IndexFlatL2(dimension)
-index.add(embeddings)
-
-print(f"Number of vectors in FAISS index: {index.ntotal}")
-
-
-VECTOR_STORE_DIR = Path(__file__).resolve().parent.parent / "data"
-faiss.write_index(index, str(VECTOR_STORE_DIR / "vector_index.faiss"))
-
-
-with open(VECTOR_STORE_DIR / "chunks.pkl", "wb") as f:
-    pickle.dump(chunks, f)
-
-print("FAISS index and chunks saved in data/")
+if __name__ == "__main__":
+    build_index()

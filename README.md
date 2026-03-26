@@ -9,11 +9,11 @@ A Retrieval-Augmented Generation (RAG) system that answers biomedical questions 
 This project implements a full RAG pipeline:
 
 1. **Fetch** — PubMed abstracts on diabetes are retrieved using the NCBI Entrez API
-2. **Preprocess** — Abstracts are cleaned and chunked into overlapping segments for better retrieval
+2. **Preprocess** — Abstracts are cleaned and chunked into overlapping segments, with PMID metadata attached to every chunk
 3. **Embed** — Chunks are encoded using `all-MiniLM-L6-v2` and stored in a FAISS vector index
 4. **Retrieve** — At query time, the most semantically relevant chunks are retrieved with distance-based filtering
 5. **Generate** — A local LLM (LLaMA via Ollama) generates a grounded answer using the retrieved context
-6. **Interface** — A Streamlit web app provides a clean UI for querying the system, with source citations
+6. **Interface** — A Streamlit web app displays the answer alongside cited PubMed sources with clickable links
 
 ---
 
@@ -30,14 +30,14 @@ diabetes-rag-llm/
 ├── src/
 │   ├── __init__.py
 │   ├── fetch_data.py       # Fetches abstracts from PubMed via Entrez
-│   ├── preprocess.py       # Cleans and chunks abstracts using LangChain text splitter
+│   ├── preprocess.py       # Cleans and chunks abstracts, attaches PMID to each chunk
 │   ├── embeddings.py       # Generates embeddings and builds FAISS index
-│   ├── retriever.py        # Loads FAISS index and retrieves relevant chunks
+│   ├── retriever.py        # Loads FAISS index and retrieves relevant chunks with PMID
 │   └── generator.py        # Generates answers using Ollama (LLaMA 3)
 │
 └── data/
     ├── diabetes_abstracts.json   # Raw PubMed abstracts (generated)
-    ├── chunks.json               # Preprocessed text chunks (generated)
+    ├── chunks.json               # Preprocessed text chunks with PMID metadata (generated)
     ├── chunks.pkl                # Serialised chunks for retrieval (generated)
     └── vector_index.faiss        # FAISS vector index (generated)
 ```
@@ -110,7 +110,7 @@ Fetches 50 PubMed abstracts about diabetes and saves them to `data/diabetes_abst
 python -m src.preprocess
 ```
 
-Cleans and splits abstracts into 500-character chunks with 100-character overlap, saved to `data/chunks.json`.
+Cleans and splits abstracts into 500-character chunks with 100-character overlap. Each chunk is saved with its source PMID attached, so source attribution is preserved through the full pipeline.
 
 ### Step 3 — Generate embeddings and build FAISS index
 
@@ -135,7 +135,10 @@ Then open [http://localhost:8501](http://localhost:8501) in your browser.
 Features:
 - Ask biomedical questions grounded in PubMed research
 - Adjust the number of retrieved sources using the slider
-- View the retrieved PubMed chunks that informed the answer, with relevance distance scores
+- View the retrieved chunks that informed the answer, each showing:
+  - The source PMID
+  - The relevance distance score
+  - A clickable **View on PubMed** link to the original paper
 
 ### Option B — CLI Interactive Mode
 
@@ -172,9 +175,12 @@ To switch models or tune retrieval, edit `config.py` — changes apply across th
 
 **Answer:** *(Generated from retrieved PubMed context using LLaMA 3)*
 
-According to the context, Diabetes mellitus (DM) is a major contributor to disability and mortality, accounting for nearly 10% of all deaths in people aged 20 to 79 years.
+Diabetes mellitus (DM) is a major contributor to disability and mortality, accounting for nearly 10% of all deaths in people aged 20 to 79 years.
 
-**Retrieved Sources:** 5 chunks retrieved from the knowledge base, each with a relevance distance score shown in the UI.
+**Retrieved Sources:** 5 chunks retrieved from the knowledge base, each displaying:
+- Source PMID (e.g. `PMID: 41884250`)
+- Relevance distance score
+- Clickable link to the original PubMed paper
 
 > **Note:** Answers are grounded strictly in the retrieved PubMed abstracts. The richer and larger the knowledge base, the more comprehensive the answers. Consider increasing `max_results` in `fetch_data.py` for broader coverage.
 
@@ -204,7 +210,8 @@ According to the context, Diabetes mellitus (DM) is a major contributor to disab
 - [x] Add source chunk display in the Streamlit UI
 - [x] Add light text cleaning in `preprocess.py`
 - [x] Add batch fetching in `fetch_data.py`
-- [ ] Add PMID metadata through the full pipeline for proper source attribution
+- [x] Add PMID metadata through the full pipeline for proper source attribution
+- [x] Add clickable PubMed links in the Streamlit UI
 - [ ] Increase abstract coverage (fetch 200+ abstracts for richer answers)
 - [ ] Explore PubMed Central (PMC) full-text articles for deeper context
 - [ ] Add streaming responses in the Streamlit UI

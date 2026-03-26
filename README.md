@@ -14,6 +14,7 @@ This project implements a full RAG pipeline:
 4. **Retrieve** — At query time, the most semantically relevant chunks are retrieved with distance-based filtering
 5. **Generate** — A local LLM (LLaMA via Ollama) generates a grounded answer using the retrieved context
 6. **Interface** — A Streamlit web app displays the answer alongside cited PubMed sources with clickable links
+7. **Evaluate** — A RAGAS evaluation pipeline measures pipeline quality using 4 metrics with local Hugging Face models
 
 ---
 
@@ -33,20 +34,22 @@ diabetes-rag-llm/
 │   ├── preprocess.py       # Cleans and chunks abstracts, attaches PMID to each chunk
 │   ├── embeddings.py       # Generates embeddings and builds FAISS index
 │   ├── retriever.py        # Loads FAISS index and retrieves relevant chunks with PMID
-│   └── generator.py        # Generates answers using Ollama (LLaMA 3)
+│   ├── generator.py        # Generates answers using Ollama (LLaMA 3)
+│   └── evaluate.py         # RAGAS evaluation pipeline with local Hugging Face models
 │
 └── data/
-    ├── diabetes_abstracts.json   # Raw PubMed abstracts (generated)
-    ├── chunks.json               # Preprocessed text chunks with PMID metadata (generated)
-    ├── chunks.pkl                # Serialised chunks for retrieval (generated)
-    └── vector_index.faiss        # FAISS vector index (generated)
+    ├── diabetes_abstracts.json     # Raw PubMed abstracts (generated)
+    ├── chunks.json                 # Preprocessed text chunks with PMID metadata (generated)
+    ├── chunks.pkl                  # Serialised chunks for retrieval (generated)
+    ├── vector_index.faiss          # FAISS vector index (generated)
+    └── evaluation_results.json     # RAGAS evaluation scores (generated)
 ```
 
 ---
 
 ## ⚙️ Prerequisites
 
-- Python 3.9+
+- Python 3.11+
 - [Ollama](https://ollama.com/) installed and running locally
 - LLaMA 3 pulled via Ollama:
 
@@ -54,7 +57,14 @@ diabetes-rag-llm/
 ollama pull llama3
 ```
 
-> **Note:** `all-MiniLM-L6-v2` is used for embeddings via `sentence-transformers` (installed as a Python package — no Ollama pull needed).
+- BAAI/bge-large-en-v1.5 downloaded via Hugging Face CLI (used for evaluation):
+
+```bash
+pip install huggingface_hub
+huggingface-cli download BAAI/bge-large-en-v1.5
+```
+
+> **Note:** `all-MiniLM-L6-v2` is used for embeddings via `sentence-transformers` (installed as a Python package — no separate download needed).
 
 ---
 
@@ -67,10 +77,10 @@ git clone https://github.com/VishalSaravanan02/diabetes-rag-llm.git
 cd diabetes-rag-llm
 ```
 
-### 2. Create and activate a virtual environment
+### 2. Create and activate a virtual environment (Python 3.11+)
 
 ```bash
-python -m venv .venv
+python3.11 -m venv .venv
 source .venv/bin/activate        # macOS/Linux
 .venv\Scripts\activate           # Windows
 ```
@@ -150,6 +160,46 @@ Type your question at the prompt and press Enter. Type `exit` or `quit` to stop.
 
 ---
 
+## 📊 Evaluating the Pipeline
+
+The evaluation pipeline uses [RAGAS](https://docs.ragas.io/) with a local LLM (llama3 via Ollama) and a local Hugging Face embedding model to measure pipeline quality across 4 metrics.
+
+### Run the evaluation
+
+```bash
+python -m src.evaluate
+```
+
+This runs 10 test questions through the full RAG pipeline and scores each one. Results are printed to the terminal and saved to `data/evaluation_results.json`.
+
+### Metrics explained
+
+| Metric | Description |
+|---|---|
+| **Faithfulness** | Are answers grounded in the retrieved context? Measures hallucination. |
+| **Answer Relevancy** | Does the answer actually address the question asked? |
+| **Context Precision** | Are the retrieved chunks relevant to the question? |
+| **Context Recall** | Do the retrieved chunks contain all the information needed to answer? |
+
+### Baseline results (50 abstracts, llama3, top_k=5)
+
+| Metric | Score |
+|---|---|
+| Faithfulness | 0.8333 |
+| Answer Relevancy | 0.5377 |
+| Context Precision | 0.0000 |
+| Context Recall | 0.5000 |
+
+**Interpretation:**
+- **Faithfulness (0.83)** — when answers are generated, they are well grounded in the retrieved PubMed context
+- **Answer Relevancy (0.54)** — moderate relevancy; some questions returned "I don't know" due to limited abstract coverage
+- **Context Precision (0.00)** — scoring affected by llama3's inconsistent adherence to the evaluation prompt format
+- **Context Recall (0.50)** — retrieval covers about half the necessary information; increasing the number of abstracts would directly improve this score
+
+> **Note:** Scores are expected to improve significantly by fetching more abstracts (200+) and using full paper text instead of abstracts only.
+
+---
+
 ## ⚙️ Configuration
 
 All key settings are centralised in `config.py` at the project root:
@@ -182,8 +232,6 @@ Diabetes mellitus (DM) is a major contributor to disability and mortality, accou
 - Relevance distance score
 - Clickable link to the original PubMed paper
 
-> **Note:** Answers are grounded strictly in the retrieved PubMed abstracts. The richer and larger the knowledge base, the more comprehensive the answers. Consider increasing `max_results` in `fetch_data.py` for broader coverage.
-
 ---
 
 ## 🛠️ Tech Stack
@@ -196,6 +244,7 @@ Diabetes mellitus (DM) is a major contributor to disability and mortality, accou
 | Vector store | FAISS (`faiss-cpu`) |
 | LLM | LLaMA 3 via Ollama |
 | Web interface | Streamlit |
+| Evaluation | RAGAS + `BAAI/bge-large-en-v1.5` (Hugging Face) |
 
 ---
 
@@ -212,9 +261,11 @@ Diabetes mellitus (DM) is a major contributor to disability and mortality, accou
 - [x] Add batch fetching in `fetch_data.py`
 - [x] Add PMID metadata through the full pipeline for proper source attribution
 - [x] Add clickable PubMed links in the Streamlit UI
+- [x] Add RAGAS evaluation pipeline with local Hugging Face models
 - [ ] Increase abstract coverage (fetch 200+ abstracts for richer answers)
 - [ ] Explore PubMed Central (PMC) full-text articles for deeper context
 - [ ] Add streaming responses in the Streamlit UI
+- [ ] Implement hybrid retrieval (BM25 + FAISS) for better search quality
 
 ---
 

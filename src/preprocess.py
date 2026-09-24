@@ -11,8 +11,9 @@ What this does
     * "sentence"  — sentence-aware packing: split into sentences, then pack
                     them up to CHUNK_SIZE chars with CHUNK_OVERLAP overlap so
                     chunks never cut a sentence in half.
-- Carries full source metadata (pmid, title, journal, year) onto EVERY chunk,
-  so downstream retrieval can build rich citations ("Smith et al., J, 2026").
+- Carries full source metadata (pmid, title, journal, year, authors, study
+  types) onto EVERY chunk, so downstream retrieval can build rich citations
+  ("Smith, Lee, Patel et al., Diabetes Care, 2016") and evidence badges.
 - Writes a self-describing JSON file: a `meta` header recording the exact build
   parameters, plus the `chunks` list. The header makes every eval run traceable
   back to the chunking config that produced it.
@@ -23,6 +24,9 @@ Output schema (CHUNKS_FILE)
   "meta": { "chunk_strategy": ..., "chunk_size": ..., "total_chunks": ..., ... },
   "chunks": [
     {"text": ..., "pmid": ..., "title": ..., "journal": ..., "year": ...,
+     "authors": ["Smith", "Lee", "Patel", "et al."],
+     "authors_display": "Smith, Lee, Patel et al.",
+     "publication_types": ["Journal Article", "Randomized Controlled Trial"],
      "chunk_index": 0, "n_chunks_in_source": 3},
     ...
   ]
@@ -33,10 +37,9 @@ import json
 import re
 from datetime import datetime, timezone
 
-try:  # modern path
-    from langchain_text_splitters import RecursiveCharacterTextSplitter
-except ImportError:  # fallback for older langchain installs
-    from langchain.text_splitter import RecursiveCharacterTextSplitter
+# LangChain 1.x moved the splitters into their own package; the old
+# `langchain.text_splitter` path no longer exists, so there is no fallback.
+from langchain_text_splitters import RecursiveCharacterTextSplitter
 
 from config import (
     ABSTRACTS_FILE,
@@ -47,6 +50,27 @@ from config import (
     MIN_ABSTRACT_LENGTH,
     EMBEDDING_MODEL,
 )
+
+
+def format_authors(authors):
+    """["Smith", "Lee", "Patel", "et al."] -> "Smith, Lee, Patel et al." """
+    authors = [a for a in (authors or []) if a]
+    if not authors:
+        return ""
+    if authors[-1] == "et al.":
+        return ", ".join(authors[:-1]) + " et al."
+    return ", ".join(authors)
+
+
+def _fetch_meta():
+    """Read the fetch record written next to the abstracts file, if present."""
+    meta_file = ABSTRACTS_FILE.with_name(ABSTRACTS_FILE.stem + ".meta.json")
+    if not meta_file.exists():
+        return {}
+    with open(meta_file, encoding="utf-8") as f:
+        meta = json.load(f)
+    keep = ("mode", "query", "from_year", "to_year", "per_year", "records", "fetched_at")
+    return {k: meta[k] for k in keep if k in meta}
 
 
 def clean_text(text):
@@ -157,6 +181,9 @@ def preprocess():
                 "title": item.get("title"),
                 "journal": item.get("journal"),
                 "year": item.get("year"),
+                "authors": item.get("authors", []),
+                "authors_display": format_authors(item.get("authors")),
+                "publication_types": item.get("publication_types", []),
                 "chunk_index": i,
                 "n_chunks_in_source": len(pieces),
             })
@@ -175,6 +202,7 @@ def preprocess():
             "chunk_overlap": CHUNK_OVERLAP,
             "total_chunks": len(all_chunks),
             "embedding_model_hint": EMBEDDING_MODEL,
+            "source_fetch": _fetch_meta(),
             "created_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
         },
         "chunks": all_chunks,

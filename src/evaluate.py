@@ -12,9 +12,8 @@ from ragas.llms import LangchainLLMWrapper
 from ragas.embeddings import LangchainEmbeddingsWrapper
 from langchain_huggingface import HuggingFaceEmbeddings
 from langchain_ollama import ChatOllama
-from src.retriever import retrieve
-from src.generator import generate_answer
-from config import TOP_K
+from src.pipeline import STATUS_OK, answer_question
+from config import DATA_DIR, LLM_MODEL, TOP_K
 
 
 # Test Dataset
@@ -100,15 +99,15 @@ def build_eval_dataset():
 
         print(f"[{i}/{len(TEST_QUESTIONS)}] {question}")
 
-        # Retrieve relevant chunks
-        results = retrieve(question, top_k=TOP_K)
-
-        # Extract chunk texts for context
-        retrieved_contexts = [r["chunk"] for r in results] if results else ["No context found."]
-
-        # Generate answer from context
-        context = "\n\n".join(retrieved_contexts)
-        answer  = generate_answer(question, context)
+        # Retrieve + generate through the shared pipeline (same path as the app)
+        result = answer_question(question, top_k=TOP_K)
+        retrieved_contexts = [s["text"] for s in result.sources] or ["No context found."]
+        if result.status == STATUS_OK:
+            answer = result.answer
+        elif result.status == "no_results":
+            answer = "No relevant sources were found."
+        else:
+            raise RuntimeError(f"Generation failed for '{question}': {result.error}")
 
         questions.append(question)
         answers.append(answer)
@@ -139,8 +138,8 @@ def run_evaluation():
     # Set up local LLM and embeddings for RAGAS
     print("\nLoading evaluation models...")
 
-    # Use Ollama llama3 as the evaluation LLM
-    eval_llm = LangchainLLMWrapper(ChatOllama(model="llama3"))
+    # Judge LLM via Ollama (Phase 5 replaces this with a separate, stronger judge)
+    eval_llm = LangchainLLMWrapper(ChatOllama(model=LLM_MODEL))
 
     # Uses the locally cached BAAI/bge-large-en-v1.5 model
     # Download it first with: huggingface-cli download BAAI/bge-large-en-v1.5
@@ -189,7 +188,7 @@ def run_evaluation():
         print(f"   Context Recall:    {row['context_recall']:.4f}")
 
     # Save results to disk
-    output_path = "data/evaluation_results.json"
+    output_path = DATA_DIR / "evaluation_results.json"
     results_dict = scores.to_dict(orient="records")
 
     with open(output_path, "w") as f:

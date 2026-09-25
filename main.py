@@ -1,53 +1,62 @@
-from src.retriever import retrieve
-from src.generator import generate_answer
+"""
+Ask the PubMed RAG system questions from the terminal.
+
+Usage (from the project root):
+    python main.py "What is HbA1c?"      # one question
+    python main.py                       # interactive; type 'exit' to stop
+"""
+
+import sys
+import textwrap
+
 from config import TOP_K
+from src.pipeline import STATUS_ERROR, STATUS_NO_RESULTS, answer_question
+from src.store import IndexNotReadyError
+
+PUBMED_URL = "https://pubmed.ncbi.nlm.nih.gov/{}/"
 
 
-def answer_question(query, top_k=TOP_K):
-    """
-    Retrieve relevant chunks from the FAISS index and generate
-    a grounded answer using the local LLM.
+def print_result(result):
+    print()
+    if result.status == STATUS_NO_RESULTS:
+        print("No sufficiently relevant papers found in the knowledge base.")
+        print("Try rephrasing, or ask something more specific to diabetes research.")
+        return
 
-    Args:
-        query:  The user's question
-        top_k:  Number of chunks to retrieve (default from config)
+    if result.status == STATUS_ERROR:
+        print(f"Error: {result.error}")
+    else:
+        print("=== Answer ===\n")
+        for paragraph in result.answer.split("\n"):
+            print(textwrap.fill(paragraph, width=100) if paragraph else "")
 
-    Returns:
-        A tuple of (answer, sources) where sources is a list of PMIDs
-    """
+    print("\n=== Sources ===")
+    for i, s in enumerate(result.sources, 1):
+        byline = ", ".join(str(x) for x in (s.get("authors_display"), s.get("journal"), s.get("year")) if x)
+        print(f"[{i}] {s.get('title') or 'Untitled'}")
+        print(f"    {byline}")
+        print(f"    PMID {s['pmid']}  similarity {s['score']:.2f}  {PUBMED_URL.format(s['pmid'])}")
 
-    # Retrieve relevant chunks
-    results = retrieve(query, top_k=top_k)
 
-    if not results:
-        return "I couldn't find any relevant information in the knowledge base for that question.", []
+def main():
+    try:
+        if len(sys.argv) > 1:
+            print_result(answer_question(" ".join(sys.argv[1:]), top_k=TOP_K))
+            return
 
-    # Build context from retrieved chunks
-    context = "\n\n".join([r["chunk"] for r in results])
-
-    # Generate answer
-    answer = generate_answer(query, context)
-
-    return answer
+        print("=== PubMed Diabetes RAG (local LLM) ===")
+        print("Type a question, or 'exit' to stop.")
+        while True:
+            question = input("\n> ").strip()
+            if question.lower() in ("exit", "quit"):
+                break
+            if question:
+                print_result(answer_question(question, top_k=TOP_K))
+    except IndexNotReadyError as e:
+        sys.exit(str(e))
+    except (KeyboardInterrupt, EOFError):
+        print()
 
 
 if __name__ == "__main__":
-    print("=== PubMed RAG QA System (Local LLM) ===")
-    print("Type 'exit' or 'quit' to stop.\n")
-
-    while True:
-        user_query = input("\nEnter your question: ").strip()
-
-        if not user_query:
-            continue
-
-        if user_query.lower() in ("exit", "quit"):
-            print("Exiting app...")
-            break
-
-        try:
-            answer = answer_question(user_query, top_k=TOP_K)
-            print("\n=== Generated Answer ===\n")
-            print(answer)
-        except Exception as e:
-            print(f"Error: {str(e)}")
+    main()

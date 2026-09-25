@@ -41,6 +41,7 @@ import datetime as dt
 import json
 import os
 import re
+import ssl
 import sys
 import time
 from collections import Counter
@@ -81,9 +82,40 @@ DEFAULT_QUERY = (
 
 _YEAR_RE = re.compile(r"\b(?:19|20)\d{2}\b")
 
+SSL_HELP = """\
+Couldn't make a secure connection to PubMed: Python doesn't trust the SSL
+certificate it received (CERTIFICATE_VERIFY_FAILED).
+
+Common fixes:
+  - macOS with Python from python.org: run "Install Certificates.command"
+    (Applications > Python 3.x), or create the virtual environment with
+    Homebrew's Python instead.
+  - On a work or university network, a VPN, or with antivirus "web protection",
+    HTTPS traffic may be intercepted. Try another network, or ask for the
+    network's root certificate.
+See "Troubleshooting" in the README for details."""
+
+
+class FetchError(RuntimeError):
+    """A PubMed request failed in a way that retrying won't fix."""
+
+
+def _is_ssl_cert_error(exc):
+    """True for certificate-verification failures (retrying can't fix these)."""
+    reason = getattr(exc, "reason", exc)
+    return isinstance(reason, ssl.SSLCertVerificationError) or isinstance(exc, ssl.SSLCertVerificationError)
+
+
+def _explain(exc):
+    """A readable one-paragraph explanation of a network error."""
+    if _is_ssl_cert_error(exc):
+        return SSL_HELP
+    reason = getattr(exc, "reason", exc)
+    return f"Couldn't reach PubMed ({reason}). Check your internet connection and try again."
+
 
 # ── NCBI calls ───────────────────────────────────────────────────────────────
-def _search(query, max_results, year=None):
+def _search(query, max_results, year=None, max_retries=3):
     """
     Run esearch with history enabled.
 
@@ -102,9 +134,18 @@ def _search(query, max_results, year=None):
     if year is not None:
         kwargs.update(datetype="pdat", mindate=str(year), maxdate=str(year))
 
-    handle = Entrez.esearch(**kwargs)
-    record = Entrez.read(handle)
-    handle.close()
+    for attempt in range(1, max_retries + 1):
+        try:
+            handle = Entrez.esearch(**kwargs)
+            record = Entrez.read(handle)
+            handle.close()
+            break
+        except Exception as e:  # noqa: BLE001 - network/parse errors both retry
+            if _is_ssl_cert_error(e) or attempt == max_retries:
+                raise FetchError(_explain(e)) from e
+            wait = 2 ** attempt
+            print(f"    ! search failed ({e}); retry {attempt}/{max_retries} in {wait}s")
+            time.sleep(wait)
 
     matched = int(record["Count"])
     return record["WebEnv"], record["QueryKey"], min(matched, max_results), matched
@@ -126,11 +167,13 @@ def _fetch_batch(webenv, query_key, start, batch_size, max_retries=3):
             handle.close()
             return records["PubmedArticle"]
         except Exception as e:  # noqa: BLE001 - network/parse errors both retry
+            if _is_ssl_cert_error(e):
+                raise FetchError(_explain(e)) from e
             wait = 2 ** attempt
             print(f"    ! batch at {start} failed ({e}); retry {attempt}/{max_retries} in {wait}s")
             time.sleep(wait)
     print(f"    ! giving up on batch at {start}")
-    return []
+    return None                      # None = failed (different from an empty batch)
 
 
 # ── Parsing ──────────────────────────────────────────────────────────────────
@@ -222,14 +265,18 @@ def _collect(webenv, query_key, count, batch_size, seen):
 
     Skips records with an empty abstract and PMIDs already in `seen` (which is
     updated in place), so de-duplication works across several searches.
-    Returns (articles, n_skipped_empty, n_skipped_duplicate).
+    Returns (articles, n_skipped_empty, n_skipped_duplicate, n_missing), where
+    n_missing counts records in batches that failed even after retries.
     """
-    articles, skipped_empty, skipped_dup = [], 0, 0
+    articles, skipped_empty, skipped_dup, missing = [], 0, 0, 0
     for start in range(0, count, batch_size):
         # The last batch may be smaller: never ask for more than `count` records in total.
         n = min(batch_size, count - start)
         print(f"    fetching {start + 1}-{start + n} of {count} ...")
         batch = _fetch_batch(webenv, query_key, start, n)
+        if batch is None:
+            missing += n
+            continue
         for article in batch:
             try:
                 parsed = _parse_article(article)
@@ -245,7 +292,7 @@ def _collect(webenv, query_key, count, batch_size, seen):
             seen.add(parsed["pmid"])
             articles.append(parsed)
         time.sleep(_SLEEP_BETWEEN_BATCHES)
-    return articles, skipped_empty, skipped_dup
+    return articles, skipped_empty, skipped_dup, missing
 
 
 # ── Output ───────────────────────────────────────────────────────────────────
@@ -286,6 +333,12 @@ def _save(articles, out_path, meta):
     print(f"\nSaved {len(articles)} abstracts (with metadata) to {out_path}")
     print(f"Saved fetch details to {meta_path_for(out_path)}")
 
+    missing = meta.get("missing_from_failed_batches", 0)
+    if missing:
+        print(f"\nWARNING: {missing} records could not be downloaded after several retries, "
+              "so this corpus is INCOMPLETE.\nRe-run the same command with --overwrite "
+              "(e.g. on a more stable connection).")
+
 
 # ── Public API ───────────────────────────────────────────────────────────────
 def fetch_pubmed(query=DEFAULT_QUERY, max_results=5000, batch_size=200, out_path=ABSTRACTS_FILE):
@@ -295,7 +348,7 @@ def fetch_pubmed(query=DEFAULT_QUERY, max_results=5000, batch_size=200, out_path
     webenv, query_key, count, matched = _search(query, max_results)
     print(f"{matched} matching records; will fetch {count} in batches of {batch_size}.\n")
 
-    articles, skipped_empty, skipped_dup = _collect(webenv, query_key, count, batch_size, set())
+    articles, skipped_empty, skipped_dup, missing = _collect(webenv, query_key, count, batch_size, set())
 
     meta = {
         "mode": "single_query",
@@ -305,6 +358,7 @@ def fetch_pubmed(query=DEFAULT_QUERY, max_results=5000, batch_size=200, out_path
         "matched": matched,
         "skipped_empty_abstract": skipped_empty,
         "skipped_duplicate": skipped_dup,
+        "missing_from_failed_batches": missing,
     }
     _save(articles, out_path, meta)
     return articles
@@ -320,7 +374,7 @@ def fetch_pubmed_by_year(from_year, to_year, per_year=300, query=DEFAULT_QUERY,
     for year in range(from_year, to_year + 1):
         webenv, query_key, count, matched = _search(query, per_year, year=year)
         print(f"  {year}: {matched} matching records, fetching {count}")
-        year_articles, skipped_empty, skipped_dup = _collect(
+        year_articles, skipped_empty, skipped_dup, missing = _collect(
             webenv, query_key, count, batch_size, seen
         )
         articles.extend(year_articles)
@@ -330,6 +384,7 @@ def fetch_pubmed_by_year(from_year, to_year, per_year=300, query=DEFAULT_QUERY,
             "saved": len(year_articles),
             "skipped_empty_abstract": skipped_empty,
             "skipped_duplicate": skipped_dup,
+            "missing_from_failed_batches": missing,
         }
         if len(year_articles) < per_year and matched >= per_year:
             print(f"    note: saved {len(year_articles)} (some had no abstract or were duplicates)")
@@ -343,6 +398,7 @@ def fetch_pubmed_by_year(from_year, to_year, per_year=300, query=DEFAULT_QUERY,
         "to_year": to_year,
         "per_year": per_year,
         "per_year_stats": per_year_stats,
+        "missing_from_failed_batches": sum(v["missing_from_failed_batches"] for v in per_year_stats.values()),
     }
     _save(articles, out_path, meta)
     return articles
@@ -377,6 +433,13 @@ def main(argv=None):
         print(f"{args.out} already exists. Rename it first (to keep it), or re-run with --overwrite.")
         sys.exit(1)
 
+    try:
+        _run(args)
+    except FetchError as e:
+        sys.exit(f"\n{e}")
+
+
+def _run(args):
     if args.from_year is not None:
         fetch_pubmed_by_year(
             from_year=args.from_year,

@@ -1,0 +1,30 @@
+{"id": "d01", "type": "definitional", "question": "What is insulin resistance?", "gold_pmids": [], "source": "hand_written"}
+{"id": "d02", "type": "definitional", "question": "What is HbA1c and what does it tell you?", "gold_pmids": [], "source": "hand_written"}
+{"id": "d03", "type": "definitional", "question": "What is diabetic ketoacidosis?", "gold_pmids": [], "source": "hand_written"}
+{"id": "d04", "type": "definitional", "question": "What is gestational diabetes?", "gold_pmids": [], "source": "hand_written"}
+{"id": "d05", "type": "definitional", "question": "What is latent autoimmune diabetes in adults (LADA)?", "gold_pmids": [], "source": "hand_written"}
+{"id": "d06", "type": "definitional", "question": "What is diabetic kidney disease?", "gold_pmids": [], "source": "hand_written"}
+{"id": "d07", "type": "definitional", "question": "What is prediabetes?", "gold_pmids": [], "source": "hand_written"}
+{"id": "d08", "type": "definitional", "question": "How do GLP-1 receptor agonists lower blood glucose?", "gold_pmids": [], "source": "hand_written"}
+{"id": "d09", "type": "definitional", "question": "How do SGLT2 inhibitors work?", "gold_pmids": [], "source": "hand_written"}
+{"id": "d10", "type": "definitional", "question": "What is diabetic peripheral neuropathy?", "gold_pmids": [], "source": "hand_written"}
+{"id": "m01", "type": "multi_paper", "question": "Do SGLT2 inhibitors reduce hospitalisation for heart failure in people with type 2 diabetes?", "gold_pmids": [], "source": "hand_written"}
+{"id": "m02", "type": "multi_paper", "question": "How do GLP-1 receptor agonists affect body weight?", "gold_pmids": [], "source": "hand_written"}
+{"id": "m03", "type": "multi_paper", "question": "Can bariatric surgery put type 2 diabetes into remission?", "gold_pmids": [], "source": "hand_written"}
+{"id": "m04", "type": "multi_paper", "question": "What are the risk factors for diabetic foot ulcers?", "gold_pmids": [], "source": "hand_written"}
+{"id": "m05", "type": "multi_paper", "question": "Are people with diabetes more likely to have depression?", "gold_pmids": [], "source": "hand_written"}
+{"id": "m06", "type": "multi_paper", "question": "Does continuous glucose monitoring improve glycaemic control?", "gold_pmids": [], "source": "hand_written"}
+{"id": "m07", "type": "multi_paper", "question": "Is gum disease linked to diabetes?", "gold_pmids": [], "source": "hand_written"}
+{"id": "m08", "type": "multi_paper", "question": "Is vitamin D deficiency associated with type 2 diabetes?", "gold_pmids": [], "source": "hand_written"}
+{"id": "m09", "type": "multi_paper", "question": "What are the dangers of hypoglycaemia in older adults with diabetes?", "gold_pmids": [], "source": "hand_written"}
+{"id": "m10", "type": "multi_paper", "question": "Does metformin have benefits beyond lowering blood glucose?", "gold_pmids": [], "source": "hand_written"}
+{"id": "u01", "type": "unanswerable", "question": "What is the first-line treatment for migraine?", "gold_pmids": [], "source": "hand_written"}
+{"id": "u02", "type": "unanswerable", "question": "How should a sprained ankle be treated?", "gold_pmids": [], "source": "hand_written"}
+{"id": "u03", "type": "unanswerable", "question": "What causes hay fever?", "gold_pmids": [], "source": "hand_written"}
+{"id": "u04", "type": "unanswerable", "question": "How is head lice treated in children?", "gold_pmids": [], "source": "hand_written"}
+{"id": "u05", "type": "unanswerable", "question": "How is asthma diagnosed in children?", "gold_pmids": [], "source": "hand_written"}
+{"id": "u06", "type": "unanswerable", "question": "What is the capital of Canada?", "gold_pmids": [], "source": "hand_written"}
+{"id": "u07", "type": "unanswerable", "question": "How do electric cars charge?", "gold_pmids": [], "source": "hand_written"}
+{"id": "u08", "type": "unanswerable", "question": "What is a good recipe for pancakes?", "gold_pmids": [], "source": "hand_written"}
+{"id": "u09", "type": "unanswerable", "question": "How much does a month's supply of insulin cost in Germany in 2026?", "gold_pmids": [], "source": "hand_written"}
+{"id": "u10", "type": "unanswerable", "question": "Which new diabetes drugs were approved in 2027?", "gold_pmids": [], "source": "hand_written"}

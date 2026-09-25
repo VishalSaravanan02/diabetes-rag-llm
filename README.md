@@ -239,6 +239,28 @@ All settings live in `config.py`:
 
 ---
 
+## 🩺 Troubleshooting
+
+**`CERTIFICATE_VERIFY_FAILED` when fetching from PubMed**
+Python doesn't trust the secure certificate it received. On macOS with Python from python.org, run **Install Certificates.command** (in Applications > Python 3.x) once, or create the virtual environment with Homebrew's Python (`/opt/homebrew/bin/python3.11 -m venv .venv`). On a work or university network, a VPN, or with antivirus "web protection", HTTPS traffic may be intercepted: try another network.
+
+**"Can't reach Ollama"**
+Start Ollama with `ollama serve` (keep that terminal open), or open the Ollama app. With Homebrew, `brew services start ollama` keeps it running in the background.
+
+**"Ollama doesn't have the model"**
+Download it with `ollama pull llama3` (or whichever model `LLM_MODEL` names).
+
+**"The search index is out of date"**
+A setting or the chunks changed since the index was built. Rebuild with `python -m src.preprocess && python -m src.embeddings`.
+
+**"No sufficiently relevant papers were found"**
+Nothing in the knowledge base passed the relevance threshold. Try rephrasing with more specific terms. This is also the expected result for questions outside diabetes research.
+
+**The fetch finished with "this corpus is INCOMPLETE"**
+Some batches failed even after retries (usually an unstable connection). Re-run the same command with `--overwrite`.
+
+---
+
 ## ⚠️ Known Limitations
 
 - **Abstracts only**, not full papers, so answers can miss details found only in the full text

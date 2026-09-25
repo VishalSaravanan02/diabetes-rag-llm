@@ -164,7 +164,7 @@ Also writes `index_meta.json`, which records the embedding model and a fingerpri
 ### Option A: Streamlit web app (recommended)
 
 ```bash
-streamlit run app.py
+python -m streamlit run app.py
 ```
 
 Then open [http://localhost:8501](http://localhost:8501).

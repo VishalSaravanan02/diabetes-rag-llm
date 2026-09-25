@@ -9,8 +9,9 @@ __pycache__/
 env/
 venv/
 
-# Data files (FAISS index, chunks)
-data/
+# Generated data (keep the data/ folder itself via .gitkeep)
+data/*
+!data/.gitkeep
 *.faiss
 *.pkl
 

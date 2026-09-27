@@ -5,7 +5,7 @@ import math
 import pytest
 
 from src.evaluation.metrics import (
-    hit_at_k, mean, mrr_at_k, ndcg_at_k, percentile, pmid_ranking, recall_at_k,
+    bootstrap_ci, hit_at_k, mean, mrr_at_k, ndcg_at_k, percentile, pmid_ranking, recall_at_k,
 )
 
 
@@ -50,3 +50,25 @@ def test_mean_and_percentile():
     assert percentile([10, 20, 30, 40], 50) == 25
     assert percentile([5], 95) == 5
     assert math.isnan(percentile([], 50))
+
+
+def test_graded_ndcg_prefers_directly_answering_papers_on_top():
+    grades = {"a": 2, "b": 1}
+    best = ndcg_at_k(["a", "b"], {"a", "b"}, grades=grades)
+    swapped = ndcg_at_k(["b", "a"], {"a", "b"}, grades=grades)
+    assert best == pytest.approx(1.0)
+    assert swapped < best
+    # hand-computed: dcg = 1/log2(2) + 2/log2(3); ideal = 2/log2(2) + 1/log2(3)
+    assert swapped == pytest.approx((1 + 2 / math.log2(3)) / (2 + 1 / math.log2(3)))
+
+
+def test_graded_ndcg_without_grades_matches_binary():
+    assert ndcg_at_k(["x", "a"], {"a"}, grades=None) == ndcg_at_k(["x", "a"], {"a"})
+
+
+def test_bootstrap_ci_contains_mean_and_is_reproducible():
+    values = [1, 0, 1, 1, 0, 1, 1, 1, 0, 1]
+    low, high = bootstrap_ci(values)
+    assert low <= 0.7 <= high
+    assert bootstrap_ci(values) == (low, high)              # same seed, same answer
+    assert bootstrap_ci([1, 1, 1]) == (1.0, 1.0)

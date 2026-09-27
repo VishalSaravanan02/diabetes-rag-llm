@@ -42,14 +42,20 @@ def mrr_at_k(ranking, gold, k=10):
     return 0.0
 
 
-def ndcg_at_k(ranking, gold, k=10):
+def ndcg_at_k(ranking, gold, k=10, grades=None):
     """
-    Normalised discounted cumulative gain with binary relevance, in [0, 1].
-    Rewards putting gold papers near the top; 1.0 = all gold papers ranked first.
+    Normalised discounted cumulative gain, in [0, 1].
+
+    Rewards putting relevant papers near the top. With `grades` ({pmid: 0-2}),
+    a directly answering paper (2) counts more than a partial one (1); without
+    grades every gold paper counts 1. 1.0 = the best possible order.
     """
     gold = set(gold)
-    dcg = sum(1 / math.log2(rank + 1) for rank, pmid in enumerate(ranking[:k], start=1) if pmid in gold)
-    ideal = sum(1 / math.log2(rank + 1) for rank in range(1, min(len(gold), k) + 1))
+    gain = {p: (grades.get(p, 1) if grades else 1) for p in gold}
+    dcg = sum(gain[pmid] / math.log2(rank + 1)
+              for rank, pmid in enumerate(ranking[:k], start=1) if pmid in gold)
+    ideal_gains = sorted(gain.values(), reverse=True)[:k]
+    ideal = sum(g / math.log2(rank + 1) for rank, g in enumerate(ideal_gains, start=1))
     return dcg / ideal if ideal else 0.0
 
 
@@ -66,3 +72,23 @@ def percentile(values, p):
     pos = (len(values) - 1) * p / 100
     lo, hi = math.floor(pos), math.ceil(pos)
     return values[lo] + (values[hi] - values[lo]) * (pos - lo)
+
+
+def bootstrap_ci(values, n_resamples=2000, confidence=0.95, seed=0):
+    """
+    Confidence interval for the mean of per-question scores, by resampling questions.
+
+    "If we had asked a different set of questions like these, where would the average
+    plausibly land?" A wide interval means the test set is too small to be sure.
+    Returns (low, high); (nan, nan) for no values. Fixed seed = reproducible.
+    """
+    import random
+
+    values = list(values)
+    if not values:
+        return float("nan"), float("nan")
+    rng = random.Random(seed)
+    n = len(values)
+    means = sorted(sum(rng.choice(values) for _ in range(n)) / n for _ in range(n_resamples))
+    tail = (1 - confidence) / 2
+    return means[int(tail * n_resamples)], means[int((1 - tail) * n_resamples) - 1]

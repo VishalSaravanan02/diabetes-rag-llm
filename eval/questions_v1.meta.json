@@ -1,0 +1,25 @@
+{
+  "version": 1,
+  "frozen_at": "2026-09-27T00:40:02+00:00",
+  "n_questions": 84,
+  "by_type": {
+    "single_fact": 54,
+    "definitional": 10,
+    "multi_paper": 10,
+    "unanswerable": 10
+  },
+  "gold_papers": 172,
+  "how_built": {
+    "single_fact": "Drafted by llama3.1 from one abstract; pre-screened by Claude; kept, edited or dropped by the author after checking the reference answer against the abstract. Gold = the source paper (grade 2).",
+    "definitional": "Written with Claude. Gold = pooled candidates (dense top 8 + TF-IDF top 8), pre-screened by Claude, verified by the author, graded 0-2.",
+    "multi_paper": "Written with Claude. Gold as for definitional questions.",
+    "unanswerable": "Written with Claude; outside the corpus. Pools checked: no paper answers them. Gold = none."
+  },
+  "inputs_sha256": {
+    "reviewed.jsonl": "76c2b4a40a838d331efa1dd2910f2e21ee00670865e971d3ce61fad0802aff44",
+    "hard_questions.jsonl": "749373257ea6f6a0107b5b6dfc20fd22a31add8b32b76991e2611f61e99570e2",
+    "relevance_judgments.json": "f808ad2d02792f59068fdebbd8bb899a417ad44049d107319d851440b7f74ab8"
+  },
+  "questions_sha256": "017782dda29da9eb4f0e7ee6e29ebde207f27ccaf6a322d45d5e8c5c7bdd7906",
+  "splits": "none: all questions are used for reporting (too few for a separate dev split); Phase 6 experiments are fixed in advance and each is run once."
+}
